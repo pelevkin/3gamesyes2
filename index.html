@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Match-3 Endless TMA</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg-color: #18222d;
+      --secondary-bg: #23303f;
+      --text-color: #ffffff;
+      --accent-color: #3390ec;
+      --success-color: #2ecc71;
+      --danger-color: #ff4d4f;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .header {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--secondary-bg);
+      padding: 12px 16px;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      opacity: 0.7;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .level-badge {
+      background: var(--accent-color);
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .timer-container {
+      width: 100%;
+      height: 10px;
+      background: var(--secondary-bg);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .timer-bar {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #00c6ff, #0072ff);
+      transition: width 0.1s linear, background 0.3s;
+    }
+
+    .timer-bar.danger {
+      background: linear-gradient(90deg, #ff416c, #ff4b2b);
+    }
+
+    .board-wrapper {
+      position: relative;
+      background: var(--secondary-bg);
+      padding: 8px;
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      gap: 4px;
+      width: 344px;
+      height: 344px;
+      max-width: 86vw;
+      max-height: 86vw;
+      aspect-ratio: 1 / 1;
+    }
+
+    .tile {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      line-height: 1;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.15s, opacity 0.18s;
+    }
+
+    @media (max-width: 400px) {
+      .tile {
+        font-size: 6.2vw;
+      }
+    }
+
+    .tile.selected {
+      background: rgba(51, 144, 236, 0.45);
+      transform: scale(1.08);
+      box-shadow: 0 0 0 2px var(--accent-color);
+    }
+
+    .tile.matched {
+      transform: scale(0);
+      opacity: 0;
+    }
+
+    .toast {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8);
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 800;
+      font-size: 18px;
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.25s ease;
+      z-index: 10;
+      white-space: nowrap;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .footer {
+      width: 100%;
+      max-width: 380px;
+      display: flex;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: var(--secondary-bg);
+      color: var(--text-color);
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn:active {
+      opacity: 0.7;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 22, 30, 0.92);
+      backdrop-filter: blur(6px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 24px;
+      text-align: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+
+    .overlay.active {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .overlay h2 {
+      font-size: 26px;
+    }
+
+    .overlay p {
+      font-size: 16px;
+      opacity: 0.85;
+      max-width: 320px;
+    }
+
+    .overlay-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+      max-width: 280px;
+      margin-top: 6px;
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      color: #fff;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    .btn-ad {
+      background: var(--success-color);
+      color: #0b1912;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="stats-row">
+      <div class="stat-box">
+        <span class="stat-label">Счёт</span>
+        <span class="stat-value" id="score">0</span>
+      </div>
+      <div class="level-badge" id="level">Ур. 1</div>
+      <div class="stat-box" style="text-align: right;">
+        <span class="stat-label">Рекорд</span>
+        <span class="stat-value" id="best-score">0</span>
+      </div>
+    </div>
+    <div class="timer-container">
+      <div class="timer-bar" id="timer-bar"></div>
+    </div>
+  </div>
+
+  <div class="board-wrapper">
+    <div class="board" id="board"></div>
+    <div class="toast" id="toast">Комбо x2!</div>
+  </div>
+
+  <div class="footer">
+    <button class="btn" id="shuffle-btn">🔀 Перемешать (-50)</button>
+    <button class="btn" id="share-btn">🏆 Поделиться</button>
+  </div>
+
+  <!-- Модальное окно между уровнями -->
+  <div class="overlay" id="level-up-modal">
+    <h2 id="level-up-title">Уровень 2!</h2>
+    <p>Темп игры растёт. Нажми кнопку, чтобы продолжить на новом уровне.</p>
+    <div class="overlay-actions">
+      <button class="btn-ad" id="next-level-ad-btn">🚀 Продолжить на новом уровне</button>
+    </div>
+  </div>
+
+  <!-- Экран проигрыша -->
+  <div class="overlay" id="game-over">
+    <h2>Время вышло!</h2>
+    <p>Ваш счёт: <strong id="final-score">0</strong></p>
+    <div class="overlay-actions">
+      <button class="btn-ad" id="revive-ad-btn">🎬 +15 сек за просмотр (Реклама)</button>
+      <button class="btn-primary" id="restart-btn">Играть снова</button>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. Безопасная инициализация Telegram WebApp ---
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    const isTMA = Boolean(tg && tg.initData && tg.initData.length > 0);
+
+    if (isTMA) {
+      try {
+        tg.ready();
+        tg.expand();
+        if (typeof tg.disableVerticalSwipes === 'function') {
+          tg.disableVerticalSwipes();
+        }
+        if (tg.themeParams?.bg_color) {
+          document.documentElement.style.setProperty('--bg-color', tg.themeParams.bg_color);
+        }
+        if (tg.themeParams?.secondary_bg_color) {
+          document.documentElement.style.setProperty('--secondary-bg', tg.themeParams.secondary_bg_color);
+        }
+        if (tg.themeParams?.text_color) {
+          document.documentElement.style.setProperty('--text-color', tg.themeParams.text_color);
+        }
+        if (tg.themeParams?.button_color) {
+          document.documentElement.style.setProperty('--accent-color', tg.themeParams.button_color);
+        }
+      } catch (e) {
+        console.warn('TMA init warning:', e);
+      }
+    }
+
+    function haptic(type = 'light') {
+      if (!isTMA || !tg.HapticFeedback) return;
+      try {
+        if (type === 'success' || type === 'error') {
+          tg.HapticFeedback.notificationOccurred(type);
+        } else {
+          tg.HapticFeedback.impactOccurred(type);
+        }
+      } catch (e) {}
+    }
+
+    // --- 2. Настройки игры ---
+    const AD_URL = 'https://uplcm.com/4/12323843';
+    const SIZE = 8;
+    const GEMS = ['💎', '🔥', '🍀', '⚡', '🔮', '🍋'];
+    const INITIAL_TIME = 45;
+    const LEVEL_STEP_SCORE = 1000;
+
+    let grid = [];
+    let score = 0;
+    let bestScore = 0;
+    let level = 1;
+    let pendingLevel = 1;
+    let timeLeft = INITIAL_TIME;
+    let isLocked = false;
+    let isPausedForLevel = false;
+    let isGameOver = false;
+    let reviveUsedInRun = false;
+    let selectedTile = null;
+    let timerInterval = null;
+
+    // Элементы DOM
+    const boardEl = document.getElementById('board');
+    const scoreEl = document.getElementById('score');
+    const bestScoreEl = document.getElementById('best-score');
+    const levelEl = document.getElementById('level');
+    const timerBarEl = document.getElementById('timer-bar');
+    const toastEl = document.getElementById('toast');
+    const levelUpModalEl = document.getElementById('level-up-modal');
+    const levelUpTitleEl = document.getElementById('level-up-title');
+    const nextLevelAdBtn = document.getElementById('next-level-ad-btn');
+    const gameOverEl = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
+    const reviveAdBtn = document.getElementById('revive-ad-btn');
+
+    function openAdLink() {
+      if (isTMA && typeof tg.openLink === 'function') {
+        tg.openLink(AD_URL);
+      } else {
+        window.open(AD_URL, '_blank', 'noopener,noreferrer');
+      }
+    }
+
+    // --- 3. Сохранение рекорда ---
+    function loadBestScore() {
+      try {
+        const local = parseInt(localStorage.getItem('m3_best') || '0', 10);
+        bestScore = isNaN(local) ? 0 : local;
+        bestScoreEl.textContent = bestScore;
+      } catch (e) {
+        bestScore = 0;
+      }
+
+      if (isTMA && tg.CloudStorage) {
+        try {
+          tg.CloudStorage.getItem('m3_best', (err, val) => {
+            if (!err && val) {
+              bestScore = Math.max(bestScore, parseInt(val, 10) || 0);
+              bestScoreEl.textContent = bestScore;
+            }
+          });
+        } catch (e) {}
+      }
+    }
+
+    function saveBestScore() {
+      if (score > bestScore) {
+        bestScore = score;
+        bestScoreEl.textContent = bestScore;
+        try {
+          localStorage.setItem('m3_best', bestScore.toString());
+        } catch (e) {}
+        if (isTMA && tg.CloudStorage) {
+          try {
+            tg.CloudStorage.setItem('m3_best', bestScore.toString());
+          } catch (e) {}
+        }
+      }
+    }
+
+    // --- 4. Логика игрового поля ---
+    function randomGem() {
+      return GEMS[Math.floor(Math.random() * GEMS.length)];
+    }
+
+    function showToast(text) {
+      toastEl.textContent = text;
+      toastEl.classList.add('show');
+      setTimeout(() => toastEl.classList.remove('show'), 900);
+    }
+
+    function initBoard() {
+      let attempts = 0;
+      do {
+        grid = [];
+        for (let r = 0; r < SIZE; r++) {
+          grid[r] = [];
+          for (let c = 0; c < SIZE; c++) {
+            let gem;
+            do {
+              gem = randomGem();
+            } while (
+              (c >= 2 && grid[r][c - 1] === gem && grid[r][c - 2] === gem) ||
+              (r >= 2 && grid[r - 1][c] === gem && grid[r - 2][c] === gem)
+            );
+            grid[r][c] = gem;
+          }
+        }
+        attempts++;
+      } while (!hasPossibleMoves() && attempts < 20);
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = '';
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          tile.dataset.r = r;
+          tile.dataset.c = c;
+          tile.textContent = grid[r][c];
+          if (selectedTile && selectedTile.r === r && selectedTile.c === c) {
+            tile.classList.add('selected');
+          }
+          boardEl.appendChild(tile);
+        }
+      }
+    }
+
+    function getTileEl(r, c) {
+      return boardEl.querySelector(`.tile[data-r="${r}"][data-c="${c}"]`);
+    }
+
+    function findMatches() {
+      const matched = new Set();
+
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE - 2; c++) {
+          const gem = grid[r][c];
+          if (!gem) continue;
+          if (grid[r][c + 1] === gem && grid[r][c + 2] === gem) {
+            let k = c;
+            while (k < SIZE && grid[r][k] === gem) {
+              matched.add(`${r},${k}`);
+              k++;
+            }
+          }
+        }
+      }
+
+      for (let c = 0; c < SIZE; c++) {
+        for (let r = 0; r < SIZE - 2; r++) {
+          const gem = grid[r][c];
+          if (!gem) continue;
+          if (grid[r + 1][c] === gem && grid[r + 2][c] === gem) {
+            let k = r;
+            while (k < SIZE && grid[k][c] === gem) {
+              matched.add(`${k},${c}`);
+              k++;
+            }
+          }
+        }
+      }
+
+      return Array.from(matched).map(str => {
+        const [r, c] = str.split(',').map(Number);
+        return { r, c };
+      });
+    }
+
+    function hasPossibleMoves() {
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          if (c < SIZE - 1) {
+            swapData(r, c, r, c + 1);
+            const hasMatch = findMatches().length > 0;
+            swapData(r, c, r, c + 1);
+            if (hasMatch) return true;
+          }
+          if (r < SIZE - 1) {
+            swapData(r, c, r + 1, c);
+            const hasMatch = findMatches().length > 0;
+            swapData(r, c, r + 1, c);
+            if (hasMatch) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function swapData(r1, c1, r2, c2) {
+      const temp = grid[r1][c1];
+      grid[r1][c1] = grid[r2][c2];
+      grid[r2][c2] = temp;
+    }
+
+    function shuffleBoard(manual = false) {
+      if (manual) {
+        if (score < 50 || isLocked || isGameOver || isPausedForLevel) {
+          haptic('error');
+          showToast('Нужно 50 очков!');
+          return;
+        }
+        score -= 50;
+        scoreEl.textContent = score;
+      }
+
+      const flat = grid.flat();
+      let tries = 0;
+      do {
+        for (let i = flat.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [flat[i], flat[j]] = [flat[j], flat[i]];
+        }
+        for (let r = 0; r < SIZE; r++) {
+          for (let c = 0; c < SIZE; c++) {
+            grid[r][c] = flat[r * SIZE + c];
+          }
+        }
+        tries++;
+      } while ((findMatches().length > 0 || !hasPossibleMoves()) && tries < 50);
+
+      if (tries >= 50) {
+        initBoard();
+      }
+
+      renderBoard();
+      haptic('medium');
+      showToast('Поле перемешано!');
+    }
+
+    function openLevelUpModal(nextLvl) {
+      pendingLevel = nextLvl;
+      isPausedForLevel = true;
+      levelUpTitleEl.textContent = `Уровень ${nextLvl}!`;
+      levelUpModalEl.classList.add('active');
+      haptic('success');
+    }
+
+    function confirmNextLevelWithAd() {
+      openAdLink();
+      level = pendingLevel;
+      levelEl.textContent = `Ур. ${level}`;
+      timeLeft = Math.min(INITIAL_TIME, timeLeft + 8);
+      isPausedForLevel = false;
+      levelUpModalEl.classList.remove('active');
+      showToast(`Уровень ${level}! +8 сек`);
+    }
+
+    const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+    async function handleSwap(r1, c1, r2, c2) {
+      if (isLocked || isGameOver || isPausedForLevel) return;
+      isLocked = true;
+      selectedTile = null;
+
+      swapData(r1, c1, r2, c2);
+      renderBoard();
+      haptic('light');
+      await sleep(160);
+
+      let matches = findMatches();
+      if (matches.length === 0) {
+        swapData(r1, c1, r2, c2);
+        renderBoard();
+        haptic('error');
+        isLocked = false;
+        return;
+      }
+
+      let combo = 1;
+      let reachedNewLevel = 0;
+
+      while (matches.length > 0) {
+        matches.forEach(({ r, c }) => {
+          const el = getTileEl(r, c);
+          if (el) el.classList.add('matched');
+        });
+
+        const gained = matches.length * 10 * combo;
+        score += gained;
+        scoreEl.textContent = score;
+        saveBestScore();
+
+        const targetLevel = Math.floor(score / LEVEL_STEP_SCORE) + 1;
+        if (targetLevel > level && targetLevel > reachedNewLevel) {
+          reachedNewLevel = targetLevel;
+        } else if (combo > 1) {
+          showToast(`Комбо x${combo}!`);
+        }
+
+        const timeBonus = Math.max(0.8, (matches.length * 0.6) - (level * 0.05));
+        timeLeft = Math.min(INITIAL_TIME, timeLeft + timeBonus);
+
+        haptic(combo > 1 ? 'heavy' : 'medium');
+        await sleep(200);
+
+        matches.forEach(({ r, c }) => {
+          grid[r][c] = null;
+        });
+
+        for (let c = 0; c < SIZE; c++) {
+          let emptyRow = SIZE - 1;
+          for (let r = SIZE - 1; r >= 0; r--) {
+            if (grid[r][c] !== null) {
+              grid[emptyRow][c] = grid[r][c];
+              if (emptyRow !== r) grid[r][c] = null;
+              emptyRow--;
+            }
+          }
+          for (let r = emptyRow; r >= 0; r--) {
+            grid[r][c] = randomGem();
+          }
+        }
+
+        renderBoard();
+        await sleep(200);
+
+        matches = findMatches();
+        combo++;
+      }
+
+      if (!hasPossibleMoves()) {
+        await sleep(300);
+        shuffleBoard(false);
+      }
+
+      isLocked = false;
+
+      if (reachedNewLevel > level) {
+        openLevelUpModal(reachedNewLevel);
+      }
+    }
+
+    // --- 5. Управление (Свайпы + Клики) ---
+    let startX = 0, startY = 0, startTile = null;
+
+    boardEl.addEventListener('pointerdown', e => {
+      if (isLocked || isGameOver || isPausedForLevel) return;
+      const tile = e.target.closest('.tile');
+      if (!tile) return;
+
+      startX = e.clientX;
+      startY = e.clientY;
+      startTile = { r: Number(tile.dataset.r), c: Number(tile.dataset.c) };
+    });
+
+    window.addEventListener('pointerup', e => {
+      if (!startTile || isLocked || isGameOver || isPausedForLevel) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+
+      if (Math.max(absX, absY) > 20) {
+        let targetR = startTile.r;
+        let targetC = startTile.c;
+        if (absX > absY) {
+          targetC += dx > 0 ? 1 : -1;
+        } else {
+          targetR += dy > 0 ? 1 : -1;
+        }
+
+        if (targetR >= 0 && targetR < SIZE && targetC >= 0 && targetC < SIZE) {
+          handleSwap(startTile.r, startTile.c, targetR, targetC);
+        }
+      } else {
+        if (!selectedTile) {
+          selectedTile = startTile;
+          haptic('light');
+          renderBoard();
+        } else {
+          const isAdjacent = Math.abs(selectedTile.r - startTile.r) + Math.abs(selectedTile.c - startTile.c) === 1;
+          if (isAdjacent) {
+            handleSwap(selectedTile.r, selectedTile.c, startTile.r, startTile.c);
+          } else {
+            selectedTile = (selectedTile.r === startTile.r && selectedTile.c === startTile.c) ? null : startTile;
+            renderBoard();
+          }
+        }
+      }
+      startTile = null;
+    });
+
+    // --- 6. Таймер и игровой цикл ---
+    function startTimer() {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (isGameOver || isPausedForLevel) return;
+
+        const decay = 0.1 * (1 + (level - 1) * 0.12);
+        timeLeft -= decay;
+
+        const pct = Math.max(0, (timeLeft / INITIAL_TIME) * 100);
+        timerBarEl.style.width = `${pct}%`;
+
+        if (pct < 25) {
+          timerBarEl.classList.add('danger');
+        } else {
+          timerBarEl.classList.remove('danger');
+        }
+
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 100);
+    }
+
+    function endGame() {
+      isGameOver = true;
+      haptic('error');
+      finalScoreEl.textContent = score;
+      reviveAdBtn.style.display = reviveUsedInRun ? 'none' : 'block';
+      gameOverEl.classList.add('active');
+    }
+
+    function reviveWithAd() {
+      if (reviveUsedInRun) return;
+      openAdLink();
+      reviveUsedInRun = true;
+      isGameOver = false;
+      isLocked = false;
+      timeLeft = 15;
+      timerBarEl.classList.remove('danger');
+      gameOverEl.classList.remove('active');
+      showToast('+15 сек!');
+      haptic('success');
+    }
+
+    function startNewGame() {
+      score = 0;
+      level = 1;
+      pendingLevel = 1;
+      timeLeft = INITIAL_TIME;
+      isGameOver = false;
+      isLocked = false;
+      isPausedForLevel = false;
+      reviveUsedInRun = false;
+      selectedTile = null;
+
+      scoreEl.textContent = '0';
+      levelEl.textContent = 'Ур. 1';
+      timerBarEl.style.width = '100%';
+      timerBarEl.classList.remove('danger');
+      levelUpModalEl.classList.remove('active');
+      gameOverEl.classList.remove('active');
+
+      initBoard();
+      renderBoard();
+      startTimer();
+    }
+
+    // Кнопки
+    nextLevelAdBtn.addEventListener('click', confirmNextLevelWithAd);
+    reviveAdBtn.addEventListener('click', reviveWithAd);
+    document.getElementById('restart-btn').addEventListener('click', startNewGame);
+    document.getElementById('shuffle-btn').addEventListener('click', () => shuffleBoard(true));
+    document.getElementById('share-btn').addEventListener('click', () => {
+      const text = `Я набрал ${score} очков в Три в ряд! Сможешь побить мой рекорд?`;
+      if (isTMA && typeof tg.switchInlineQuery === 'function') {
+        tg.switchInlineQuery(text, ['users', 'groups', 'channels']);
+      } else {
+        navigator.clipboard?.writeText(text);
+        showToast('Текст скопирован!');
+      }
+    });
+
+    // Старт после полной загрузки DOM
+    loadBestScore();
+    startNewGame();
+  </script>
+</body>
+</html>
